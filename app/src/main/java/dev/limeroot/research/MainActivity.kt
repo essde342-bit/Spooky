@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -202,7 +203,7 @@ private fun Header() {
                 .background(Brush.linearGradient(listOf(Green, Color(0xFF6FAD3D)))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Rounded.Security, null, tint = Bg, modifier = Modifier.size(25.dp))
+            Image(painter = painterResource(R.drawable.limeroot_icon), contentDescription = "LimeRoot", modifier = Modifier.size(34.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
