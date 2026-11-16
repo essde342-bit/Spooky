@@ -29,8 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 private val Bg = Color(0xFF0A0F0C)
@@ -54,10 +55,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun LimeRootApp() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var info by remember { mutableStateOf(DeviceInfo.read()) }
+    var info by remember { mutableStateOf<DeviceInfo?>(null) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        info = runCatching {
+            withContext(Dispatchers.IO) { DeviceInfo.read() }
+        }.getOrNull()
+    }
+
+    val currentInfo = info
 
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Green, onPrimary = Bg, secondary = GreenDim, background = Bg,
@@ -67,19 +76,29 @@ private fun LimeRootApp() {
         Column(Modifier.fillMaxSize().background(Bg)) {
             Header()
             Box(Modifier.weight(1f)) {
-                when (tab) {
-                    0 -> Overview(info, busy, onRefresh = {
-                        scope.launch { busy = true; delay(300); info = DeviceInfo.read(); busy = false }
+                when {
+                    currentInfo == null -> LoadingPage()
+                    tab == 0 -> Overview(currentInfo, busy, onRefresh = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                info = withContext(Dispatchers.IO) { DeviceInfo.read() }
+                            } catch (_: Exception) {
+                                // Keep the last successful snapshot if refresh fails.
+                            } finally {
+                                busy = false
+                            }
+                        }
                     }, onShare = {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_SUBJECT, "LimeRoot report")
-                            putExtra(Intent.EXTRA_TEXT, info.report())
+                            putExtra(Intent.EXTRA_TEXT, currentInfo.report())
                         }
                         context.startActivity(Intent.createChooser(intent, "Поделиться отчётом"))
                     })
-                    1 -> DevicePage(info)
-                    else -> ChecksPage(info)
+                    tab == 1 -> DevicePage(currentInfo)
+                    else -> ChecksPage(currentInfo)
                 }
             }
             NavigationBar(containerColor = Color(0xFF0E1510), windowInsets = WindowInsets.navigationBars) {
@@ -100,6 +119,19 @@ private fun LimeRootApp() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LoadingPage() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = Green)
+            Spacer(Modifier.height(14.dp))
+            Text("Читаем данные устройства", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(5.dp))
+            Text("Проверка выполняется в фоне", color = Muted, fontSize = 11.sp)
         }
     }
 }
@@ -368,10 +400,36 @@ private data class DeviceInfo(
     """.trimIndent()
 
     companion object {
-        private fun prop(key: String): String = try {
-            val p = Runtime.getRuntime().exec(arrayOf("getprop", key))
-            p.inputStream.bufferedReader().use { it.readText().trim() }.ifBlank { "—" }
-        } catch (_: Exception) { "—" }
+        // Run the fixed Android getprop utility once instead of spawning a
+        // separate process for every property. This is read-only and never uses a shell.
+        private fun readProperties(): Map<String, String> = try {
+            val process = ProcessBuilder("/system/bin/getprop")
+                .redirectErrorStream(true)
+                .start()
+            try {
+                val lines = process.inputStream.bufferedReader().use { it.readLines() }
+                if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                    emptyMap()
+                } else {
+                    lines.mapNotNull { line ->
+                        val separator = line.indexOf("]: [")
+                        if (line.startsWith("[") && separator > 1 && line.endsWith("]")) {
+                            line.substring(1, separator) to line.substring(separator + 4, line.length - 1)
+                        } else {
+                            null
+                        }
+                    }.toMap()
+                }
+            } finally {
+                if (process.isAlive) process.destroyForcibly()
+            }
+        } catch (_: Exception) {
+            emptyMap()
+        }
+
+        private fun prop(properties: Map<String, String>, key: String): String =
+            properties[key].orEmpty().ifBlank { "—" }
 
         private fun readable(path: String): Boolean = try {
             val f = File(path)
@@ -379,19 +437,20 @@ private data class DeviceInfo(
         } catch (_: Exception) { false }
 
         fun read(): DeviceInfo {
-            val code = Build.DEVICE.ifBlank { prop("ro.product.device") }
-            val bootProp = prop("ro.boot.flash.locked")
+            val properties = readProperties()
+            val code = Build.DEVICE.ifBlank { prop(properties, "ro.product.device") }
+            val bootProp = prop(properties, "ro.boot.flash.locked")
             val boot = bootProp == "1"
-            val verified = prop("ro.boot.verifiedbootstate")
+            val verified = prop(properties, "ro.boot.verifiedbootstate")
             val kernel = System.getProperty("os.version") ?: "—"
             val su = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/system_ext/bin/su", "/vendor/bin/su").any { File(it).exists() }
             fun pathText(path: String, yes: String, no: String) = if (readable(path)) yes else no
             return DeviceInfo(
-                model = Build.MODEL.ifBlank { "Unknown" }, codename = code, board = prop("ro.product.board"),
-                platform = prop("ro.board.platform").let { if (it == "—") "SM6115 · профиль lemon" else it },
+                model = Build.MODEL.ifBlank { "Unknown" }, codename = code, board = prop(properties, "ro.product.board"),
+                platform = prop(properties, "ro.board.platform").let { if (it == "—") "Не указана производителем" else it },
                 name = if (code.equals("lemon", true)) "Redmi 9T" else Build.MODEL,
                 android = "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
-                build = prop("ro.build.version.incremental"), patch = Build.VERSION.SECURITY_PATCH ?: "—",
+                build = prop(properties, "ro.build.version.incremental"), patch = Build.VERSION.SECURITY_PATCH ?: "—",
                 kernel = kernel, kernelShort = kernel.substringBefore("-"),
                 arch = System.getProperty("os.arch") ?: "—", abi = Build.SUPPORTED_ABIS.joinToString(),
                 fingerprint = Build.FINGERPRINT,
