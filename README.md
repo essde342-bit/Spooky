@@ -1,24 +1,19 @@
 # LimeRoot Research
 
-**LimeRoot Research** is an open-source, read-only Android diagnostics app initially configured for Xiaomi Redmi 9T (codename `lemon`, Qualcomm SM6115).
+A polished, read-only Android diagnostics app focused on Xiaomi Redmi 9T (`lemon`, Qualcomm SM6115).
 
-## Current status
+## Features
+- Dark charcoal interface with lime accents and three sections: Overview, Device, Diagnostics.
+- Android build identifiers, kernel version, ABI, security patch and selected boot properties.
+- Readability checks for selected kernel diagnostic paths.
+- Plain-text diagnostic report sharing.
+- No root exploit, bootloader unlocker, flashing routine or partition writer.
 
-This is the first diagnostic-only milestone. It does **not** obtain root, unlock the bootloader, exploit kernel vulnerabilities, modify partitions, or change system settings.
-
-It reports:
-- Android build and device identifiers
-- Kernel release and architecture
-- Android security patch level
-- Verified Boot properties (when readable)
-- Whether selected diagnostic paths are readable by this app
-
-A permission-denied result means Android restricts access; it does not prove a vulnerability is absent.
+## Interpretation
+A restricted path is a normal Android permission boundary; it does not prove a vulnerability is present or absent. The app checks only a few conventional `su` paths and cannot prove the device is unrooted.
 
 ## Build
+GitHub Actions builds a debug APK after a push to `main` or by manual dispatch. Download the `limeroot-debug-apk` artifact from the workflow run.
 
-The GitHub Actions workflow builds a debug APK on pushes and manual runs. Download the artifact named `limeroot-debug-apk` from the workflow run.
-
-## Safety
-
-Use only on devices you own or are authorized to test. Do not treat diagnostic output as proof that a public exploit works on a particular firmware.
+## Stack
+Kotlin · Jetpack Compose · Material 3 · Android Gradle Plugin 8.6.1 · JDK 17
