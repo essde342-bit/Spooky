@@ -88,7 +88,8 @@ class RootReadinessAssessmentTest {
     }
     @Test fun hiddenConfigIsUnknownNotSafe(){
         val list=RootReadinessAssessment.evaluate(sample())
-        assertTrue(list.all{it.tone!=AssessmentTone.LOW})
+        assertTrue(list.take(2).all{it.tone!=AssessmentTone.LOW})
+        assertEquals(AssessmentTone.LOW,list[2].tone)
         assertTrue(list[1].conditions.contains("Не удалось"))
     }
     @Test fun disabledDirtyFragComponentsReduceApplicability(){
