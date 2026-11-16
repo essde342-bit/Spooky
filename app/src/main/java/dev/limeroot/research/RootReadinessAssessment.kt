@@ -116,7 +116,7 @@ object RootReadinessAssessment {
     }
 
     private fun parseKernelVersion(raw: String): KernelVersion? {
-        val match = Regex("""(?<!\\d)(\\d+)\\.(\\d+)\\.(\\d+)""").find(raw) ?: return null
+        val match = Regex("""(?<!\d)(\d+)\.(\d+)\.(\d+)""").find(raw) ?: return null
         return runCatching { KernelVersion(match.groupValues[1].toInt(), match.groupValues[2].toInt(), match.groupValues[3].toInt()) }.getOrNull()
     }
 
