@@ -407,19 +407,33 @@ private data class DeviceInfo(
                 .redirectErrorStream(true)
                 .start()
             try {
-                val lines = process.inputStream.bufferedReader().use { it.readLines() }
                 if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
                     process.destroyForcibly()
                     emptyMap()
                 } else {
-                    lines.mapNotNull { line ->
-                        val separator = line.indexOf("]: [")
-                        if (line.startsWith("[") && separator > 1 && line.endsWith("]")) {
-                            line.substring(1, separator) to line.substring(separator + 4, line.length - 1)
-                        } else {
-                            null
-                        }
-                    }.toMap()
+                    val allowedKeys = setOf(
+                        "ro.product.device",
+                        "ro.boot.flash.locked",
+                        "ro.boot.verifiedbootstate",
+                        "ro.product.board",
+                        "ro.board.platform",
+                        "ro.build.version.incremental"
+                    )
+                    process.inputStream.bufferedReader().use { reader ->
+                        reader.lineSequence().mapNotNull { line ->
+                            val separator = line.indexOf("]: [")
+                            if (line.startsWith("[") && separator > 1 && line.endsWith("]")) {
+                                val key = line.substring(1, separator)
+                                if (key in allowedKeys) {
+                                    key to line.substring(separator + 4, line.length - 1)
+                                } else {
+                                    null
+                                }
+                            } else {
+                                null
+                            }
+                        }.toList().toMap()
+                    }
                 }
             } finally {
                 if (process.isAlive) process.destroyForcibly()
