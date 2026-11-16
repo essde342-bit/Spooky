@@ -40,15 +40,17 @@ jobs:
           test -n "$AAPT"
           PERMISSIONS="$("$AAPT" dump permissions "$APK")"
           echo "$PERMISSIONS"
-          if echo "$PERMISSIONS" | grep -q 'uses-permission:'; then
-            echo "Unexpected Android permissions found." >&2
+          UNEXPECTED="$(echo "$PERMISSIONS" | grep 'uses-permission:' | grep -v "dev.limeroot.research.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" || true)"
+          if [ -n "$UNEXPECTED" ]; then
+            echo "Unexpected Android permissions found:" >&2
+            echo "$UNEXPECTED" >&2
             exit 1
           fi
           echo "### LimeRoot APK" >> "$GITHUB_STEP_SUMMARY"
           echo "- File: $APK" >> "$GITHUB_STEP_SUMMARY"
           echo "- Size: $(du -h "$APK" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
           echo "- APK archive integrity: OK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Declared Android permissions: none" >> "$GITHUB_STEP_SUMMARY"
+          echo "- No sensitive Android permissions; only the app-private AndroidX signature permission is allowed." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload optimized APK
         uses: actions/upload-artifact@v4
