@@ -84,6 +84,7 @@ class RootReadinessAssessmentTest {
         val list=RootReadinessAssessment.evaluate(sample())
         assertEquals(AssessmentTone.POTENTIAL,list[0].tone)
         assertEquals(AssessmentTone.POTENTIAL,list[1].tone)
+        assertEquals(AssessmentTone.LOW,list[2].tone)
     }
     @Test fun hiddenConfigIsUnknownNotSafe(){
         val list=RootReadinessAssessment.evaluate(sample())
@@ -96,5 +97,24 @@ class RootReadinessAssessmentTest {
     }
     @Test fun olderKernelIsOutsideDirtyFragIntroductionRange(){
         assertEquals(AssessmentTone.LOW,RootReadinessAssessment.evaluate(sample(kernel="3.10.108"))[1].tone)
+    }
+}
+
+
+class RxRpcCveRangeTest {
+    @Test fun android419KernelPredatesRxRpcDirtyFragCve() {
+        val device = DeviceDetails(
+            manufacturer="Xiaomi", brand="Redmi", model="Redmi 9T", device="lemon", product="lemon_ru",
+            board="lemon", hardware="qcom", android="Android 12", sdk=31, build="V14.0.2.0.SJQRUXM",
+            buildType="user", buildTags="release-keys", securityPatch="2023-04-01", kernel="4.19.157",
+            architecture="aarch64", abis="arm64-v8a", fingerprint="Redmi/lemon/lemon:12/test/user/release-keys",
+            bootloaderState="Заблокирован", verifiedBootState="GREEN", vbmetaState="locked", verityMode="enforcing",
+            selinuxState="Enforcing", selinuxContext="u:r:untrusted_app:s0", capEff="0", noNewPrivs="0",
+            seccomp="2", appDebuggable=false, runtimeMaxMemoryMb=256, rootPathsFound=emptyList(),
+            kernelConfig=mapOf("CONFIG_AF_RXRPC" to "y")
+        )
+        val rxrpc = RootReadinessAssessment.evaluate(device).first { it.cveId == "CVE-2026-43500" }
+        assertEquals(AssessmentTone.LOW, rxrpc.tone)
+        assertTrue(rxrpc.versionAssessment.contains("5.3"))
     }
 }

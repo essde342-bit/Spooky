@@ -235,7 +235,7 @@ object DeviceDiagnostics {
         }
     }
 
-    private val relevantKernelConfig = setOf("CONFIG_FUTEX", "CONFIG_USER_NS", "CONFIG_XFRM_USER", "CONFIG_INET_ESP", "CONFIG_INET6_ESP", "CONFIG_AF_RXRPC")
+    private val relevantKernelConfig = setOf("CONFIG_FUTEX_PI", "CONFIG_USER_NS", "CONFIG_XFRM_USER", "CONFIG_INET_ESP", "CONFIG_INET6_ESP", "CONFIG_AF_RXRPC")
 
     private fun readKernelConfig(): Map<String, String> {
         return try {

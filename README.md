@@ -9,18 +9,18 @@ Read-only Android device and security diagnostics, with a custom LimeRoot emblem
 - Current app process isolation: Linux CapEff, NoNewPrivs and Seccomp from `/proc/self/status`.
 - Build signing tags/type and whether the installed app build is debuggable.
 - Limited checks for common `su` / Magisk paths.
-- Root-readiness research tab: read-only kernel configuration hints and upstream version-range comparison for CVE-2026-43499 and CVE-2026-43284.
+- Root-readiness research tab: read-only kernel configuration hints and upstream version-range comparison for CVE-2026-43499, CVE-2026-43284 and CVE-2026-43500.
 - Readability probes for selected kernel diagnostic files.
 - All checks run off the UI thread; refreshes are guarded against duplicate starts and failures are presented without crashing the app.
 
 ## Root vulnerability applicability (0.4.2)
 - Adds read-only kernel-config probes for FUTEX, USER_NS, XFRM_USER, IPv4/IPv6 ESP and RXRPC when /proc/config.gz is readable.
 - Reads max_user_namespaces when exposed by the device.
-- Compares the reported kernel version with public upstream ranges for CVE-2026-43499 (GhostLock) and CVE-2026-43284 (DirtyFrag).
+- Compares the reported kernel version with public upstream ranges for CVE-2026-43499 (GhostLock futex PI), CVE-2026-43284 (DirtyFrag ESP/XFRM), and CVE-2026-43500 (DirtyFrag RxRPC).
 - Separates a version-range match from proof of exploitability. Xiaomi/Qualcomm may backport fixes without changing the displayed kernel version; app-visible config and namespace limits cannot prove runtime reachability.
 - No exploit PoC, privilege-escalation attempt, module loader, shell payload, network lookup, bootloader operation or partition write is included.
 
-The Redmi 9T's reported 4.19.157 kernel overlaps the upstream version ranges for both CVEs, but the actual patch state and runtime prerequisites remain unknown without vendor patch records and further device-specific evidence. A matching version is a research lead, not a promise of temporary root.
+The Redmi 9T's reported 4.19.157 kernel overlaps the upstream introduction ranges for GhostLock and DirtyFrag ESP/XFRM. The separate DirtyFrag RxRPC issue was introduced in 5.3, so kernel 4.19 predates it. Vendor backports and runtime prerequisites remain unverified; a matching version is a research lead, not a promise of temporary root.
 
 ## TXT report
 Use **Download TXT report** in the Overview or Diagnostics screen. Android's system document picker asks where to save the file; LimeRoot does not request broad storage access.

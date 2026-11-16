@@ -675,6 +675,7 @@ private fun RootReadinessPage(device: DeviceDetails) {
                 BulletLine("Подтверждения, что Xiaomi не перенесла исправления в ядро 4.19.157.")
                 BulletLine("Полной конфигурации ядра: /proc/config.gz может быть скрыт Android.")
                 BulletLine("Проверки runtime-доступности необходимых namespace и сетевых путей.")
+                BulletLine("Публичная реализация DirtyFrag описана как ориентированная на Samsung/One UI; совместимость с Redmi 9T не подтверждена.")
                 Text("Следующий шаг — сверить исходники и патчи именно Xiaomi для сборки ${device.build}. LimeRoot ничего не запускает с root и не меняет разделы.",
                     color = RootMutedUi, fontSize = 10.sp, lineHeight = 15.sp)
             }
