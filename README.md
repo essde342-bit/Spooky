@@ -1,29 +1,42 @@
-# LimeRoot Research 0.3.0
+# LimeRoot Research 0.4.0
 
-A read-only Android diagnostics app focused on Xiaomi Redmi 9T (`lemon`, Qualcomm SM6115).
+Read-only Android device and security diagnostics, with a user-controlled UTF-8 TXT export. Developed with Xiaomi Redmi 9T (`lemon`) as the initial target, while using Android APIs that work across devices.
 
-## Features
-- Dark interface with Overview, Device and Diagnostics sections.
-- Device/build identifiers, kernel version, ABI, security patch and selected boot properties.
-- Read-only checks for selected kernel diagnostic paths and common `su` locations.
-- Plain-text report sharing, started only by the user.
-- Device inspection and property collection run off the UI thread.
-- System properties are read in one bounded process invocation; only an allowlist of six properties is retained.
+## Diagnostics
+- Device model, manufacturer, Android version/API, build, security patch, kernel and supported ABIs.
+- Verified Boot, bootloader lock, VBMeta and dm-verity properties when exposed by the manufacturer.
+- SELinux enforcement state and current process context.
+- Current app process isolation: Linux CapEff, NoNewPrivs and Seccomp from `/proc/self/status`.
+- Build signing tags/type and whether the installed app build is debuggable.
+- Limited checks for common `su` / Magisk paths.
+- Readability probes for selected kernel diagnostic files.
+- All checks run off the UI thread; refreshes are guarded against duplicate starts and failures are presented without crashing the app.
 
-## Security posture
-- No requested Android runtime/system permissions.
-- No `INTERNET` permission and cleartext network traffic is disabled.
-- Android app backup is disabled.
-- No root exploit, shell script, bootloader unlocker, flashing routine, partition writer, dynamic code loader or file-writing feature.
-- The launcher activity is the only app component declared in the manifest.
-- The report includes device/build identifiers (including the build fingerprint); sharing is optional and initiated by the user.
+## TXT report
+Use **Download TXT report** in the Overview or Diagnostics screen. Android's system document picker asks where to save the file; LimeRoot does not request broad storage access.
 
-This is a small diagnostic app, not a security product. No software can be guaranteed 100% secure. A missing `su` path does not prove the device is unrooted, and restricted kernel paths do not prove that an exploit exists or does not exist.
+The UTF-8 report includes:
+- Time of scan and a count of normal, informational, warning and critical observations.
+- Device/build/kernel information.
+- Boot, SELinux and process-isolation observations.
+- Every diagnostic check with a plain-language explanation.
+- Limitations and privacy notes.
 
-## Build
-GitHub Actions builds an R8-optimized release APK with resource shrinking after each push to `main`. The workflow also checks APK archive integrity and rejects unexpected Android permissions. Download the `limeroot-0.3.0-optimized` artifact from the workflow run.
+The report includes model, device codename and Build fingerprint. It does not collect IMEI, serial number, phone number, location, installed-app list, personal files, passwords or keys. Review the preview in the app before saving or sharing.
 
-The CI APK is signed with the temporary Android debug signing key so that it can be installed for testing. It is not a Play Store production-signing key; later CI builds may require uninstalling the prior test build before installing a newly signed one.
+## Security boundaries
+- No root exploit, shell script, bootloader unlocker, flashing routine, partition writer, dynamic code loader or network client.
+- No requested Android permissions. AndroidX may add one app-private signature-level permission for its internal receiver handling.
+- Backup disabled and cleartext network traffic disabled.
+- System-property reads use a fixed allowlist of property names; no shell is invoked.
+- The app only performs read-only diagnostics and asks the user before creating a report.
+
+This is not a root tool and not a 100% security guarantee. A missing `su` path does not prove the phone is unrooted. A restricted kernel file does not prove an exploit exists or does not exist. SELinux, Verified Boot and sandbox observations are signals, not a full firmware audit.
+
+## Build and tests
+GitHub Actions runs the report unit tests, builds an R8-optimized release APK, verifies archive integrity and APK signature, and rejects unexpected Android permissions. Download the `limeroot-0.4.0-release` artifact from the workflow run.
+
+The CI APK is signed with the temporary Android debug signing key for test installation; it is not a Play Store production signing key. Repeated CI builds may have different signing keys, so Android may require uninstalling a prior CI test build before installing a newer one.
 
 ## Stack
 Kotlin · Jetpack Compose · Material 3 · Android Gradle Plugin 8.6.1 · JDK 17
