@@ -1,4 +1,4 @@
-name: Build optimized LimeRoot APK
+name: Build and test LimeRoot
 
 on:
   push:
@@ -26,35 +26,47 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Build optimized release APK
-        run: gradle --no-daemon assembleRelease
+      - name: Run report tests and build optimized release APK
+        run: gradle --no-daemon testReleaseUnitTest assembleRelease
 
-      - name: Verify APK and report size
+      - name: Verify APK, signature and permissions
         shell: bash
         run: |
           set -euo pipefail
           APK="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
           test -n "$APK"
           unzip -t "$APK" >/dev/null
+
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -n "$AAPT"
+          test -n "$APKSIGNER"
+
+          "$APKSIGNER" verify --verbose "$APK"
           PERMISSIONS="$("$AAPT" dump permissions "$APK")"
           echo "$PERMISSIONS"
+
           UNEXPECTED="$(echo "$PERMISSIONS" | grep 'uses-permission:' | grep -v "dev.limeroot.research.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" || true)"
           if [ -n "$UNEXPECTED" ]; then
             echo "Unexpected Android permissions found:" >&2
             echo "$UNEXPECTED" >&2
             exit 1
           fi
-          echo "### LimeRoot APK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- File: $APK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Size: $(du -h "$APK" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- APK archive integrity: OK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- No sensitive Android permissions; only the app-private AndroidX signature permission is allowed." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload optimized APK
+          SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          SIZE="$(stat -c%s "$APK")"
+          echo "### LimeRoot 0.4.0" >> "$GITHUB_STEP_SUMMARY"
+          echo "- APK: $APK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $SIZE bytes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA-256: $SHA256" >> "$GITHUB_STEP_SUMMARY"
+          echo "- APK archive integrity: OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- APK signature: verified" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Unexpected Android permissions: none" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Unit tests: passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: limeroot-0.3.0-optimized
+          name: limeroot-0.4.0-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
