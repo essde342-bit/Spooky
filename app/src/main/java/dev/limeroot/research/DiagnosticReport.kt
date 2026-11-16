@@ -9,7 +9,7 @@ object DiagnosticReport {
         val critical = snapshot.checks.count { it.severity == CheckSeverity.CRITICAL }
 
         appendLine("LIMEROOT — ПОЛНЫЙ ОТЧЁТ ДИАГНОСТИКИ")
-        appendLine("Версия приложения: 0.4.0")
+        appendLine("Версия приложения: 0.4.2")
         appendLine("Дата и время: ${snapshot.generatedAt}")
         appendLine("Формат: обычный текст UTF-8")
         appendLine()
@@ -67,6 +67,24 @@ object DiagnosticReport {
             appendLine()
         }
 
+        appendLine("══════════════════ ОЦЕНКА ПРИМЕНИМОСТИ CVE ══════════════════")
+        appendLine("Назначение: оценка совпадения известных условий, а не запуск эксплойта.")
+        appendLine("Проверка ядра: ${device.kernel}")
+        appendLine("Параметр max_user_namespaces: ${device.userNamespacesMax}")
+        device.kernelConfig.toSortedMap().forEach { (key, value) -> appendLine("Конфигурация $key=$value") }
+        if (device.kernelConfig.isEmpty()) appendLine("Конфигурация ядра /proc/config.gz: не удалось прочитать; параметры неизвестны.")
+        RootReadinessAssessment.evaluate(device).forEach { finding ->
+            appendLine()
+            appendLine("${finding.cveId} — ${finding.title}")
+            appendLine("Совпадение версии: ${finding.versionAssessment}")
+            appendLine("Условия: ${finding.conditions}")
+            appendLine("Вывод: ${finding.conclusion}")
+            appendLine("Источник: ${finding.sourceUrl}")
+        }
+        appendLine()
+        appendLine("Важно: совпадение по номеру ядра не подтверждает уязвимость. Xiaomi/Qualcomm могли перенести исправления без изменения строки версии. LimeRoot не запускает эксплойты и не изменяет разделы.")
+        appendLine()
+
         appendLine("══════════════════ ПРИМЕЧАНИЯ ══════════════════")
         snapshot.notes.forEachIndexed { index, note -> appendLine("${index + 1}. $note") }
         appendLine()
@@ -76,7 +94,7 @@ object DiagnosticReport {
         appendLine("местоположение, список установленных приложений, личные файлы, пароли или ключи.")
         appendLine("Файл создаётся только после ручного выбора места сохранения пользователем.")
         appendLine()
-        appendLine("Конец отчёта LimeRoot 0.4.0")
+        appendLine("Конец отчёта LimeRoot 0.4.2")
     }
 
     private fun severityLabel(severity: CheckSeverity): String = when (severity) {

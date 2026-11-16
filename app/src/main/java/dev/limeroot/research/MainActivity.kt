@@ -5,6 +5,16 @@ import android.graphics.Color as AColor
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import kotlinx.coroutines.delay
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -129,8 +139,9 @@ private fun LimeRootApp() {
                 when {
                     snapshot == null && scanning -> LoadingPage()
                     snapshot == null -> ErrorPage(scanError ?: "Диагностика ещё не запускалась", startScan)
-                    tab == 0 -> OverviewPage(snapshot!!, scanning, startScan, onExport = { showExportDialog = true })
+                    tab == 0 -> OverviewPage(snapshot!!, scanning, startScan, onExport = { showExportDialog = true }, onRootAnalysis = { tab = 2 })
                     tab == 1 -> DevicePage(snapshot!!.device)
+                    tab == 2 -> RootReadinessPage(snapshot!!.device)
                     else -> ChecksPage(snapshot!!, scanning, startScan, onExport = { showExportDialog = true })
                 }
             }
@@ -141,7 +152,8 @@ private fun LimeRootApp() {
                 listOf(
                     Triple("Обзор", Icons.Rounded.Home, 0),
                     Triple("Устройство", Icons.Rounded.PhoneAndroid, 1),
-                    Triple("Диагностика", Icons.Rounded.BugReport, 2)
+                    Triple("Уязвимости", Icons.Rounded.Security, 2),
+                    Triple("Проверки", Icons.Rounded.BugReport, 3)
                 ).forEach { (label, icon, index) ->
                     NavigationBarItem(
                         selected = tab == index,
@@ -211,7 +223,7 @@ private fun Header() {
             Text("LimeRoot", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
             Text("ANDROID DEVICE LAB", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.8.sp)
         }
-        Pill("RESEARCH 0.4", Green)
+        Pill("0.4.2", Green)
     }
 }
 
@@ -250,7 +262,8 @@ private fun OverviewPage(
     snapshot: DiagnosticSnapshot,
     scanning: Boolean,
     onScan: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    onRootAnalysis: () -> Unit
 ) {
     val device = snapshot.device
     val good = snapshot.checks.count { it.severity == CheckSeverity.GOOD }
@@ -281,6 +294,25 @@ private fun OverviewPage(
             }
         }
 
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF172319)),
+            shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Color(0xFF334B30))) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Security, null, tint = Green, modifier = Modifier.size(21.dp))
+                    Spacer(Modifier.width(9.dp))
+                    Text("Проверка уязвимостей для временного Root", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Text("Сверяем версию ядра и доступные настройки с известными CVE. Это поиск возможных совпадений, а не запуск эксплойта и не гарантия получения Root.",
+                    color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+                OutlinedButton(onClick = onRootAnalysis, modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Green.copy(alpha = .55f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Green)) {
+                    Text("Открыть анализ уязвимостей", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Rounded.ArrowForward, null, modifier = Modifier.size(17.dp))
+                }
+            }
+        }
         Section("Итоги диагностики", "Завершено: ${snapshot.generatedAt}")
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             SummaryMetric(Modifier.weight(1f), good.toString(), "Норма", Green)
@@ -592,5 +624,112 @@ private fun Section(title: String, subtitle: String) {
 private fun Pill(label: String, color: Color) {
     Surface(color = color.copy(alpha = .12f), shape = RoundedCornerShape(30.dp), border = BorderStroke(1.dp, color.copy(alpha = .34f))) {
         Text(label, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+
+private val RootGreenUi = Color(0xFFB7F36B)
+private val RootMutedUi = Color(0xFF8E9A91)
+private val RootCardUi = Color(0xFF121A15)
+private val RootStrokeUi = Color(0xFF26332A)
+private val RootAmberUi = Color(0xFFFFC36A)
+
+@Composable
+private fun RootReadinessPage(device: DeviceDetails) {
+    val findings = remember(device) { RootReadinessAssessment.evaluate(device) }
+    val pulse = rememberInfiniteTransition(label = "root-readiness-pulse")
+    val pulseAlpha by pulse.animateFloat(0.35f, 0.95f,
+        infiniteRepeatable(tween(1050), repeatMode = RepeatMode.Reverse), label = "pulse-alpha")
+    val potentialCount = findings.count { it.tone == AssessmentTone.POTENTIAL }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Анализ временного Root", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text("Ищем совпадения по уязвимостям ядра, а не вредоносные приложения.", color = RootMutedUi, fontSize = 11.sp, lineHeight = 16.sp)
+        }
+        Card(Modifier.fillMaxWidth().animateContentSize(tween(300)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF172319)),
+            shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, Color(0xFF334B30))) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(RootGreenUi.copy(alpha = pulseAlpha)))
+                    Spacer(Modifier.width(9.dp))
+                    Text("ПРОФИЛЬ УСТРОЙСТВА", color = RootGreenUi, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                }
+                Text(if (device.device.equals("lemon",true)) "Xiaomi Redmi 9T · lemon" else "${device.manufacturer} ${device.model} · ${device.device}",
+                    color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Ядро: ${device.kernel}", color = Color(0xFFDDE8D8), fontSize = 12.sp)
+                Text("Android: ${device.android} · API ${device.sdk}", color = RootMutedUi, fontSize = 11.sp)
+                Text(if (potentialCount > 0) "$potentialCount совпадения по диапазону версий найдено. Исправления производителя ещё нужно проверить."
+                    else "Пока нет подтверждённого совпадения. Это не доказывает отсутствие уязвимостей.",
+                    color = RootAmberUi, fontSize = 11.sp, lineHeight = 16.sp)
+            }
+        }
+        Text("Проверяемые уязвимости", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        findings.forEachIndexed { index, finding -> AnimatedFindingCard(finding, index) }
+        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = RootCardUi),
+            shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, RootStrokeUi)) {
+            Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Чего пока не хватает", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                BulletLine("Подтверждения, что Xiaomi не перенесла исправления в ядро 4.19.157.")
+                BulletLine("Полной конфигурации ядра: /proc/config.gz может быть скрыт Android.")
+                BulletLine("Проверки runtime-доступности необходимых namespace и сетевых путей.")
+                Text("Следующий шаг — сверить исходники и патчи именно Xiaomi для сборки ${device.build}. LimeRoot ничего не запускает с root и не меняет разделы.",
+                    color = RootMutedUi, fontSize = 10.sp, lineHeight = 15.sp)
+            }
+        }
+        Text("Важно: это исследовательская оценка применимости CVE. Совпадение версии не означает, что временный Root точно получится.",
+            color = RootMutedUi, fontSize = 10.sp, lineHeight = 15.sp, modifier = Modifier.padding(bottom = 18.dp))
+    }
+}
+
+@Composable
+private fun AnimatedFindingCard(finding: VulnerabilityAssessment, index: Int) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(finding.cveId) { delay(index * 110L); visible = true }
+    val toneColor = when(finding.tone) {
+        AssessmentTone.POTENTIAL -> RootAmberUi
+        AssessmentTone.UNKNOWN -> RootMutedUi
+        AssessmentTone.LOW -> RootGreenUi
+    }
+    val toneLabel = when(finding.tone) {
+        AssessmentTone.POTENTIAL -> "ВОЗМОЖНОЕ СОВПАДЕНИЕ"
+        AssessmentTone.UNKNOWN -> "НЕДОСТАТОЧНО ДАННЫХ"
+        AssessmentTone.LOW -> "НИЗКАЯ ПРИМЕНИМОСТЬ"
+    }
+    AnimatedVisibility(visible, enter = fadeIn(tween(420)) + slideInVertically(tween(420)) { it / 12 }) {
+        Card(Modifier.fillMaxWidth().animateContentSize(tween(250)),
+            colors = CardDefaults.cardColors(containerColor = RootCardUi),
+            shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, RootStrokeUi)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(finding.cveId, color = RootGreenUi, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(finding.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Surface(color = toneColor.copy(alpha=.12f), shape = RoundedCornerShape(30.dp)) {
+                        Text(toneLabel, color = toneColor, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal=8.dp, vertical=6.dp))
+                    }
+                }
+                Text("Версия ядра", color=RootMutedUi, fontSize=10.sp, fontWeight=FontWeight.Bold)
+                Text(finding.versionAssessment, color=Color(0xFFE1EAE0), fontSize=11.sp, lineHeight=16.sp)
+                Text("Необходимые условия", color=RootMutedUi, fontSize=10.sp, fontWeight=FontWeight.Bold)
+                Text(finding.conditions, color=Color(0xFFE1EAE0), fontSize=11.sp, lineHeight=16.sp)
+                Divider(color=RootStrokeUi)
+                Text(finding.conclusion, color=Color.White, fontSize=11.sp, lineHeight=16.sp)
+                Text("Источник: ${finding.sourceUrl}", color=RootMutedUi, fontSize=8.sp, lineHeight=12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BulletLine(text: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(Icons.Rounded.Circle, null, tint=RootGreenUi, modifier=Modifier.size(7.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, color=RootMutedUi, fontSize=10.sp, lineHeight=15.sp)
     }
 }

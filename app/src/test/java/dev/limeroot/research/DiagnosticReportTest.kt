@@ -63,6 +63,37 @@ class DiagnosticReportTest {
         assertTrue(report.contains("IMEI"))
         assertTrue(report.contains("местоположение"))
         assertTrue(report.contains("не доказывает отсутствие"))
+        assertTrue(report.contains("ОЦЕНКА ПРИМЕНИМОСТИ CVE"))
+        assertTrue(report.contains("CVE-2026-43284"))
         assertFalse(report.contains("password="))
+    }
+}
+
+
+class RootReadinessAssessmentTest {
+    private fun sample(kernel:String="4.19.157-perf",config:Map<String,String> = emptyMap()) = DeviceDetails(
+        manufacturer="Xiaomi",brand="Redmi",model="Redmi 9T",device="lemon",product="lemon_ru",board="lemon",hardware="qcom",
+        android="Android 12",sdk=31,build="V14.0.2.0.SJQRUXM",buildType="user",buildTags="release-keys",securityPatch="2023-04-01",
+        kernel=kernel,architecture="aarch64",abis="arm64-v8a",fingerprint="Redmi/lemon/lemon:12/test/user/release-keys",
+        bootloaderState="Заблокирован",verifiedBootState="GREEN",vbmetaState="locked",verityMode="enforcing",selinuxState="Enforcing",
+        selinuxContext="u:r:untrusted_app:s0",capEff="0",noNewPrivs="0",seccomp="2",appDebuggable=false,runtimeMaxMemoryMb=256,
+        rootPathsFound=emptyList(),kernelConfig=config
+    )
+    @Test fun kernel419MatchesBothIntroductionRanges(){
+        val list=RootReadinessAssessment.evaluate(sample())
+        assertEquals(AssessmentTone.POTENTIAL,list[0].tone)
+        assertEquals(AssessmentTone.POTENTIAL,list[1].tone)
+    }
+    @Test fun hiddenConfigIsUnknownNotSafe(){
+        val list=RootReadinessAssessment.evaluate(sample())
+        assertTrue(list.all{it.tone!=AssessmentTone.LOW})
+        assertTrue(list[1].conditions.contains("Не удалось"))
+    }
+    @Test fun disabledDirtyFragComponentsReduceApplicability(){
+        val cfg=mapOf("CONFIG_XFRM_USER" to "n","CONFIG_INET_ESP" to "n","CONFIG_INET6_ESP" to "n","CONFIG_AF_RXRPC" to "n")
+        assertEquals(AssessmentTone.LOW,RootReadinessAssessment.evaluate(sample(config=cfg))[1].tone)
+    }
+    @Test fun olderKernelIsOutsideDirtyFragIntroductionRange(){
+        assertEquals(AssessmentTone.LOW,RootReadinessAssessment.evaluate(sample(kernel="3.10.108"))[1].tone)
     }
 }

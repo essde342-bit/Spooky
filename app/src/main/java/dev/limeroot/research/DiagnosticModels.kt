@@ -41,7 +41,9 @@ data class DeviceDetails(
     val seccomp: String,
     val appDebuggable: Boolean,
     val runtimeMaxMemoryMb: Long,
-    val rootPathsFound: List<String>
+    val rootPathsFound: List<String>,
+    val kernelConfig: Map<String, String> = emptyMap(),
+    val userNamespacesMax: String = "Не удалось прочитать"
 )
 
 data class DiagnosticSnapshot(

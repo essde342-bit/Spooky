@@ -2,6 +2,7 @@ package dev.limeroot.research
 
 import android.os.Build
 import java.io.File
+import java.util.zip.GZIPInputStream
 import java.math.BigInteger
 import java.util.concurrent.TimeUnit
 
@@ -30,6 +31,9 @@ object DeviceDiagnostics {
         val capEff = procStatus["CapEff"].orEmpty()
         val noNewPrivs = procStatus["NoNewPrivs"].orEmpty()
         val seccomp = procStatus["Seccomp"].orEmpty()
+
+        val kernelConfig = readKernelConfig()
+        val userNamespacesMax = readSmallText("/proc/sys/user/max_user_namespaces").ifBlank { "Не удалось прочитать" }
 
         val rootPaths = listOf(
             "/system/bin/su",
@@ -78,7 +82,9 @@ object DeviceDiagnostics {
             seccomp = seccomp.ifBlank { "Не удалось прочитать" },
             appDebuggable = appDebuggable,
             runtimeMaxMemoryMb = Runtime.getRuntime().maxMemory() / (1024 * 1024),
-            rootPathsFound = rootPaths
+            rootPathsFound = rootPaths,
+            kernelConfig = kernelConfig,
+            userNamespacesMax = userNamespacesMax
         )
 
         val checks = mutableListOf<DiagnosticCheck>()
@@ -227,6 +233,27 @@ object DeviceDiagnostics {
         } catch (_: Exception) {
             emptyMap()
         }
+    }
+
+    private val relevantKernelConfig = setOf("CONFIG_FUTEX", "CONFIG_USER_NS", "CONFIG_XFRM_USER", "CONFIG_INET_ESP", "CONFIG_INET6_ESP", "CONFIG_AF_RXRPC")
+
+    private fun readKernelConfig(): Map<String, String> {
+        return try {
+            GZIPInputStream(File("/proc/config.gz").inputStream()).bufferedReader().useLines { lines ->
+                lines.mapNotNull { line ->
+                    val pair = when {
+                        line.startsWith("CONFIG_") && '=' in line -> {
+                            val separator = line.indexOf('=')
+                            line.substring(0, separator) to line.substring(separator + 1).trim()
+                        }
+                        line.startsWith("# CONFIG_") && line.endsWith(" is not set") ->
+                            line.removePrefix("# ").removeSuffix(" is not set") to "n"
+                        else -> null
+                    }
+                    pair?.takeIf { it.first in relevantKernelConfig }
+                }.toMap()
+            }
+        } catch (_: Exception) { emptyMap() }
     }
 
     private fun canOpenForRead(path: String): Boolean = try {
