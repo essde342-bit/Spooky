@@ -1,6 +1,6 @@
-# LimeRoot Research 0.4.0
+# LimeRoot Research 0.4.1
 
-Read-only Android device and security diagnostics, with a user-controlled UTF-8 TXT export. Developed with Xiaomi Redmi 9T (`lemon`) as the initial target, while using Android APIs that work across devices.
+Read-only Android device and security diagnostics, with a custom LimeRoot emblem and user-controlled UTF-8 TXT export. Developed with Xiaomi Redmi 9T (`lemon`) as the initial target, while using Android APIs that work across devices.
 
 ## Diagnostics
 - Device model, manufacturer, Android version/API, build, security patch, kernel and supported ABIs.
@@ -34,7 +34,7 @@ The report includes model, device codename and Build fingerprint. It does not co
 This is not a root tool and not a 100% security guarantee. A missing `su` path does not prove the phone is unrooted. A restricted kernel file does not prove an exploit exists or does not exist. SELinux, Verified Boot and sandbox observations are signals, not a full firmware audit.
 
 ## Build and tests
-GitHub Actions runs the report unit tests, builds an R8-optimized release APK, verifies archive integrity and APK signature, and rejects unexpected Android permissions. Download the `limeroot-0.4.0-release` artifact from the workflow run.
+GitHub Actions runs the report unit tests, builds an R8-optimized release APK, verifies archive integrity and APK signature, and rejects unexpected Android permissions. Download the `limeroot-0.4.1-release` artifact from the workflow run.
 
 The CI APK is signed with the temporary Android debug signing key for test installation; it is not a Play Store production signing key. Repeated CI builds may have different signing keys, so Android may require uninstalling a prior CI test build before installing a newer one.
 
